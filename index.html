@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Хронология исследований интернета</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Literata:wght@500;700&display=swap">
+<style>
+html { color-scheme: light; }
+body { margin: 0; }
+
+/* Layout: заголовок, фильтры, одна горизонтальная линия времени с вертикальными отметками вверх и вниз, панель выбранного события. */
+:root {
+  --bg: #EDF0F3;
+  --card: #FFFFFF;
+  --ink: #131C26;
+  --muted: #52606E;
+  --rule: #C3CCD6;
+  --band-a: #E1E6EC;
+  --c-t: #2457C5;
+  --c-d: #0E7C66;
+  --c-m: #B4510A;
+  --c-c: #A8326A;
+  --display: 'Literata', Georgia, 'Times New Roman', serif;
+  --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F151C; --card: #18212B; --ink: #E7ECF1; --muted: #9AA7B5; --rule: #2E3A48;
+    --band-a: #17202A;
+    --c-t: #7BA3FF; --c-d: #4FD1B0; --c-m: #FFA45C; --c-c: #FF86B5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F151C; --card: #18212B; --ink: #E7ECF1; --muted: #9AA7B5; --rule: #2E3A48;
+  --band-a: #17202A;
+  --c-t: #7BA3FF; --c-d: #4FD1B0; --c-m: #FFA45C; --c-c: #FF86B5;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+  padding-inline: clamp(16px, 4vw, 40px); padding-block: 28px 56px;
+}
+.wrap { max-width: 1180px; margin-inline: auto; display: flex; flex-direction: column; gap: 26px; }
+a { color: inherit; text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Header */
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 clamp(26px, 4.2vw, 42px)/1.12 var(--display); text-wrap: balance; margin: 12px 0 16px; max-width: 24ch; }
+.head-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px 48px; align-items: start; }
+.lede { margin: 0; max-width: 62ch; font-size: 16px; }
+.how { margin: 0; color: var(--muted); font-size: 14px; max-width: 46ch; }
+.how b { color: var(--ink); font-weight: 600; }
+
+/* Controls */
+.controls { display: flex; flex-direction: column; gap: 10px; }
+.ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; min-height: 36px;
+  background: var(--card); border: 1px solid var(--rule); border-radius: 4px; cursor: pointer; font-size: 14px;
+}
+.chip:hover { border-color: var(--ink); }
+.chip[aria-pressed="false"] { background: transparent; color: var(--muted); }
+.chip[aria-pressed="false"] .sw { background: transparent; }
+.chip[aria-current="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.chip:disabled { opacity: .4; cursor: not-allowed; }
+.sw { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); border: 2px solid var(--tc); flex: none; }
+.chip .n { font: 400 12px var(--mono); color: var(--muted); }
+.chip .num { font: 500 12px var(--mono); color: var(--muted); }
+
+/* Timeline: одна линия, от неё вверх и вниз отходят отметки событий */
+.tl { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
+.tlx { position: relative; height: 300px; }
+.axis { position: absolute; top: 149px; height: 2px; background: var(--ink); }
+.axis.fut { background: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 12px); }
+.aend { position: absolute; top: 150px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); transform: translate(-50%, -50%); }
+.hl { position: absolute; top: 0; height: 100%; background: var(--band-a); }
+.stem { position: absolute; width: 1px; margin-left: -.5px; background: var(--muted); }
+.stem.sel { width: 3px; margin-left: -1.5px; background: var(--ink); }
+.adot { position: absolute; top: 150px; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; background: var(--tc); transform: translate(-50%, -50%); transition: transform .15s; }
+.adot.f { background: var(--bg); border: 3px solid var(--tc); }
+.adot.sel { transform: translate(-50%, -50%) scale(1.5); outline: 2px solid var(--ink); outline-offset: 2px; }
+.node {
+  position: absolute; height: 56px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 0; background: none; border: 0; cursor: pointer;
+}
+.node.up { top: 19px; justify-content: flex-end; }
+.node.dn { top: 225px; justify-content: flex-start; }
+.nc { width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; background: var(--tc); flex: none; transition: transform .15s; }
+.node.f .nc { background: var(--bg); border: 3px solid var(--tc); }
+.node:hover .nc { transform: scale(1.25); }
+.node.sel .nc { transform: scale(1.5); outline: 2px solid var(--ink); outline-offset: 2px; }
+.yr { padding: 4px 6px; font: 500 13px/1 var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.node.sel .yr { background: var(--ink); color: var(--bg); }
+.node:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.now-line { position: absolute; top: 0; height: 100%; width: 0; border-left: 1px dashed var(--muted); }
+.now-lab { position: absolute; top: 40px; margin-left: -18px; writing-mode: vertical-rl; font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+
+/* Panel */
+.panel { border-top: 3px solid var(--tc, var(--ink)); padding-top: 18px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px 48px; }
+.p-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.p-year { font: 500 30px/1 var(--mono); color: var(--tc); font-variant-numeric: tabular-nums; }
+.p-track { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.p-fut { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; border: 1px dashed var(--tc); color: var(--tc); padding: 4px 7px; }
+.p-title { font: 700 clamp(20px, 2.6vw, 26px)/1.2 var(--display); margin: 12px 0 10px; text-wrap: balance; }
+.p-desc { margin: 0; max-width: 62ch; }
+.p-side h3 { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.p-side p { margin: 0 0 18px; }
+.p-src { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.p-src li { overflow-wrap: anywhere; }
+.p-src a::after { content: " ↗"; color: var(--muted); }
+.p-nav { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.p-count { font: 400 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.btn { padding: 8px 14px; min-height: 36px; background: var(--card); border: 1px solid var(--ink); border-radius: 3px; cursor: pointer; font-size: 14px; }
+.btn:hover { background: var(--ink); color: var(--bg); }
+.btn.arrow { width: 48px; padding: 0; font-size: 22px; line-height: 1; }
+.btn:disabled { opacity: .35; cursor: not-allowed; background: var(--card); color: var(--ink); }
+
+/* Footer */
+.foot { border-top: 1px solid var(--rule); padding-top: 18px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 48px; font-size: 14px; color: var(--muted); }
+.foot h3 { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px; color: var(--ink); }
+.foot p, .foot ul { margin: 0; }
+.foot ul { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+@media (max-width: 860px) {
+  .head-grid, .panel, .foot { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) { .p-year { font-size: 26px; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Лента времени · 1969 — 2031</div>
+    <h1>Исследования интернета: от ARPANET до споров о данных платформ</h1>
+    <div class="head-grid">
+      <p class="lede">Исследования интернета (internet studies) — направление цифровой гуманитаристики и социальных наук, которое изучает сеть как инфраструктуру, среду сообществ и источник данных о культуре и поведении людей. Моя логика такая: сначала интернет изучают как технологию, затем как место, где живут сообщества, потом как источник данных, а сегодня главный вопрос в том, кому принадлежит доступ к этим данным и кто отвечает за их использование.</p>
+      <p class="how"><b>Как отбирались события.</b> В ленту попали 13 событий одного масштаба: появление инфраструктуры, переломные работы и институции, законы и платформенные решения, изменившие работу исследователей. Расстояния между отметками одинаковы, цвет показывает линию развития.</p>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="ctl" role="group" aria-label="Линии развития" id="tracks"></div>
+    <div class="ctl" role="group" aria-label="Эпохи" id="eras"></div>
+  </div>
+
+  <div class="tl" id="tl"><div class="tlx" id="tlx"></div></div>
+
+  <section class="panel" id="panel" aria-live="polite">
+    <div>
+      <div class="p-meta"><span class="p-year" id="pYear"></span><span class="p-track" id="pTrack"></span><span class="p-fut" id="pFut" hidden>Прогноз автора</span></div>
+      <h2 class="p-title" id="pTitle"></h2>
+      <p class="p-desc" id="pDesc"></p>
+    </div>
+    <div class="p-side">
+      <h3>Что это значит для исследований интернета</h3>
+      <p id="pWhy"></p>
+      <h3 id="pSrcH">Источники</h3>
+      <ul class="p-src" id="pSrc"></ul>
+    </div>
+    <div class="p-nav">
+      <button class="btn arrow" id="prev" type="button" aria-label="Предыдущее событие">←</button>
+      <span class="p-count" id="pCount"></span>
+      <button class="btn arrow" id="next" type="button" aria-label="Следующее событие">→</button>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div>
+      <h3>Общие источники</h3>
+      <ul>
+        <li><a href="https://www.internetsociety.org/internet/history-internet/brief-history-internet/" target="_blank" rel="noopener noreferrer">Internet Society: Brief History of the Internet</a></li>
+        <li><a href="https://aoir.org/" target="_blank" rel="noopener noreferrer">Association of Internet Researchers (AoIR)</a></li>
+        <li><a href="https://doi.org/10.1111/j.1083-6101.2007.00393.x" target="_blank" rel="noopener noreferrer">boyd &amp; Ellison: Social Network Sites (2007)</a></li>
+      </ul>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var TRACKS = {
+    t: { name: 'Инфраструктура и данные' },
+    d: { name: 'Сообщества и культура' },
+    m: { name: 'Исследования и методы' },
+    c: { name: 'Власть, право и этика' }
+  };
+  var ERAS = [
+    { id: 1, n: 'I', name: 'Сеть и Web', r: '1969–1993' },
+    { id: 2, n: 'II', name: 'Сообщества и Рунет', r: '1993–1996' },
+    { id: 3, n: 'III', name: 'Поле и платформы', r: '2000–2009' },
+    { id: 4, n: 'IV', name: 'Слежка и закрытые данные', r: '2013–2018' },
+    { id: 5, n: 'V', name: 'Закон и модели', r: '2022' },
+    { id: 6, n: 'VI', name: 'Взгляд вперёд', r: 'прогноз' }
+  ];
+  var W = function (t, u) { return [t, u]; };
+  var EVENTS = [
+    { id: 'arpanet', y: 1969, l: '1969', t: 't', era: 1,
+      title: 'ARPANET связывает первые компьютеры',
+      s: 'Появляется сеть, из которой вырастет интернет.',
+      d: 'В октябре 1969 года первое сообщение между компьютерами ушло из лаборатории Леонарда Клейнрока в UCLA в Стэнфордский исследовательский институт (SRI). К концу года в сети было четыре узла. В 1983 году ARPANET перешла на протокол TCP/IP.',
+      w: 'Сеть возникает как инфраструктура обмена между исследователями. Это точка отсчёта для всех последующих споров об открытости.',
+      src: [W('Internet Society: Brief History of the Internet', 'https://www.internetsociety.org/internet/history-internet/brief-history-internet/')] },
+    { id: 'www', y: 1993, l: '1993', t: 't', era: 1,
+      title: 'CERN открывает Web для всех',
+      s: 'Технология публикации страниц становится свободной.',
+      d: 'Тим Бернерс-Ли предложил Web в CERN в 1989 году. 30 апреля 1993 года CERN передал программное обеспечение Web в общественное достояние.',
+      w: 'Любой может создать сайт без разрешения и платы. С этого момента у сети появляются публичные страницы, которые можно собирать и изучать.',
+      src: [W('CERN: The birth of the Web', 'https://home.cern/science/computing/birth-web')] },
+    { id: 'rheingold', y: 1993, l: '1993', t: 'd', era: 2,
+      title: 'Рейнгольд описывает «виртуальное сообщество»',
+      s: 'Одна из первых книг о жизни онлайн-сообществ изнутри.',
+      d: 'Говард Рейнгольд выпустил книгу The Virtual Community (1993) о сообществе WELL. Он показал, что у онлайн-общения есть собственные нормы, дружба и конфликты.',
+      w: 'Интернет начинают изучать не только как технологию, но и как место, где складываются сообщества.',
+      src: [W('Howard Rheingold: The Virtual Community (онлайн-издание)', 'https://www.rheingold.com/vc/book/')] },
+    { id: 'ru', y: 1994, l: '1994', t: 't', era: 2,
+      title: 'Рунет получает домен .ru',
+      s: 'Российская часть сети получает собственное имя.',
+      d: '7 апреля 1994 года Россия получила национальный домен .RU, зарегистрированный международным сетевым центром InterNIC. Администратором домена стал РосНИИРОС.',
+      w: 'У Рунета появляется чёткая граница, и его можно изучать как отдельное национальное пространство: сайты, сообщества, язык.',
+      src: [W('Координационный центр доменов .RU/.РФ: о домене', 'https://cctld.ru/en/domains/about/')] },
+    { id: 'ia', y: 1996, l: '1996', t: 't', era: 2,
+      title: 'Internet Archive',
+      s: 'Веб-страницы начинают сохранять как исторический источник.',
+      d: 'Брюстер Кейл основал Internet Archive в 1996 году, чтобы сохранять страницы веба. Позднее открылась Wayback Machine, по которой можно посмотреть прежние версии сайтов.',
+      w: 'Страницы сайтов исчезают и меняются. Без архива у исследователей не было бы прошлого сети.',
+      src: [W('Internet Archive: About', 'https://archive.org/about/')] },
+    { id: 'aoir', y: 2000, l: '2000', t: 'm', era: 3,
+      title: 'Первая конференция Internet Research',
+      s: 'Исследователи интернета собираются как отдельное сообщество.',
+      d: 'В сентябре 2000 года в Университете Канзаса прошла конференция Internet Research 1.0 (организаторы Нэнси Бэйм и Джереми Хансингер). Её связывают с Ассоциацией исследователей интернета (AoIR), которую задумали в 1998 году на конференции в Drake University.',
+      w: 'У поля появляется своя площадка: общие вопросы и методы, не привязанные к одной дисциплине.',
+      src: [W('Kairos: рецензия на Internet Research 1.0', 'https://kairos.technorhetoric.net/5.2/news/silverrev.htm'), W('AoIR: Association of Internet Researchers', 'https://aoir.org/')] },
+    { id: 'nature', y: 2005, l: '2005', t: 'd', era: 3,
+      title: 'Nature сравнивает Википедию и Британнику',
+      s: 'Коллективная энциклопедия становится предметом научной оценки.',
+      d: 'Журнал Nature попросил экспертов проверить научные статьи Википедии и Encyclopaedia Britannica. По итогам число ошибок оказалось сопоставимым.',
+      w: 'Контент, созданный пользователями, начинают оценивать по тем же критериям, что и традиционные источники.',
+      src: [W('Giles, Nature (2005)', 'https://doi.org/10.1038/438900a')] },
+    { id: 'boyd', y: 2007, l: '2007', t: 'd', era: 3,
+      title: 'Определение «сайтов социальных сетей»',
+      s: 'Платформы получают общее название и рамку для анализа.',
+      d: 'Дана Бойд и Николь Эллисон в Journal of Computer-Mediated Communication дали определение сайтов социальных сетей, описали историю их появления и первые исследования.',
+      w: 'Появляется общий язык для разговора о платформах. Эту статью часто цитируют в исследованиях разных дисциплин.',
+      src: [W('boyd & Ellison, JCMC (2007)', 'https://doi.org/10.1111/j.1083-6101.2007.00393.x')] },
+    { id: 'css', y: 2009, l: '2009', t: 'm', era: 3,
+      title: 'Манифест вычислительной социальной науки',
+      s: 'Цифровые следы людей становятся данными для социальных наук.',
+      d: 'Статья Дэвида Лэйзера и коллег в Science (2009) заявила, что следы онлайн-активности позволяют изучать поведение людей и групп в масштабах, недоступных опросам.',
+      w: 'Интернет превращается из предмета описания в источник данных. Вместе с этим появляются вопросы приватности и репрезентативности.',
+      src: [W('Lazer et al., Science (2009)', 'https://doi.org/10.1126/science.1167742')] },
+    { id: 'snowden', y: 2013, l: '2013', t: 'c', era: 4,
+      title: 'Разоблачения Сноудена',
+      s: 'Слежка за сетью перестаёт быть догадкой.',
+      d: 'С июня 2013 года Эдвард Сноуден передал журналистам документы о программах массовой слежки АНБ в интернете и телефонной связи.',
+      w: 'Пользователи и исследователи узнают, что данные об их поведении собирают государства. Возникают вопросы об этике сбора и использования данных.',
+      src: [W('Christian Science Monitor: хронология разоблачений', 'https://www.csmonitor.com/USA/2013/1016/NSA-revelations-A-timeline-of-what-s-come-out-since-Snowden-leaks-began'), W('Nextgov: что стало известно в 2013 году', 'https://www.nextgov.com/cxo-briefing/2013/12/everything-we-learned-edward-snowden-2013/76106/')] },
+    { id: 'ca', y: 2018, l: '2018', t: 'c', era: 4,
+      title: 'Cambridge Analytica, закрытие API и GDPR',
+      s: 'Данные платформ закрываются, а закон требует защищать персональные данные.',
+      d: 'В апреле 2018 года Facebook сообщил, что данные до 87 млн пользователей могли попасть к Cambridge Analytica. Платформа закрыла многие каналы доступа к данным (API), и исследования, которые на них опирались, остановились. Аксель Брунс назвал это «APIcalypse». С 25 мая 2018 года в ЕС действует GDPR.',
+      w: 'Главный источник данных для исследований соцсетей становится недоступным. С тех пор исследования идут через спор о доступе.',
+      src: [W('PBS NewsHour: до 87 млн пользователей', 'https://www.pbs.org/newshour/nation/facebook-says-as-many-as-87-million-people-may-have-had-their-data-accessed'), W('Bruns, After the «APIcalypse» (2019)', 'https://doi.org/10.1080/1369118X.2019.1637447'), W('Regulation (EU) 2016/679, GDPR (EUR-Lex)', 'https://eur-lex.europa.eu/eli/reg/2016/679/oj')] },
+    { id: 'dsa', y: 2022, l: '2022', t: 'c', era: 5,
+      title: 'Закон ЕС о цифровых услугах (DSA)',
+      s: 'ЕС вводит механизм доступа исследователей к данным крупнейших платформ.',
+      d: 'Регламент (ЕС) 2022/2065 вступил в силу в ноябре 2022 года. Он обязывает крупнейшие платформы открывать данные допущенным исследователям (статья 40).',
+      w: 'Доступ к данным из любезности платформ превращается в юридическую процедуру.',
+      src: [W('Regulation (EU) 2022/2065, DSA (EUR-Lex)', 'https://eur-lex.europa.eu/eli/reg/2022/2065/oj')] },
+    { id: 'chatgpt', y: 2022, l: '2022', t: 'd', era: 5,
+      title: 'ChatGPT',
+      s: 'Тексты, написанные моделями, попадают в сеть.',
+      d: '30 ноября 2022 года OpenAI открыла ChatGPT для публики. Тексты, написанные моделями, стали попадать в интернет, и исследователям приходится учитывать, кто автор.',
+      w: 'Меняется сам предмет исследований: в интернете появляется машинный контент.',
+      src: [W('OpenAI: Introducing ChatGPT', 'https://openai.com/index/chatgpt/')] },
+    { id: 'f1', y: 2028, l: 'около 2028', t: 'm', era: 6, f: true,
+      title: 'Данные платформ по запросу',
+      s: 'Исследователи получают данные через единые процедуры.',
+      d: 'Допущенные исследователи будут получать данные крупнейших платформ через единые процедуры. Вокруг этого сложится своя этика и методология: что запрашивать, как хранить, как делиться результатами.',
+      w: 'Исследования интернета станут менее зависимыми от доброй воли платформ, но более зависимыми от регуляторов.',
+      src: [W('Regulation (EU) 2022/2065, DSA (основание прогноза)', 'https://eur-lex.europa.eu/eli/reg/2022/2065/oj')] },
+    { id: 'f2', y: 2031, l: 'около 2031', t: 't', era: 6, f: true,
+      title: 'Сеть, где много текстов от моделей',
+      s: 'Архивам придётся помечать происхождение материалов.',
+      d: 'Доля машинно созданного контента вырастет. Архивам придётся помечать происхождение материалов, а исследователям решать, как считать такие тексты источником.',
+      w: 'Вопрос о том, кто говорит в интернете, станет методологическим.',
+      src: [W('Shumailov et al., The Curse of Recursion (основание прогноза)', 'https://arxiv.org/abs/2305.17493'), W('OpenAI: Introducing ChatGPT (основание прогноза)', 'https://openai.com/index/chatgpt/')] }
+  ];
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var $ = function (id) { return document.getElementById(id); };
+  var active = { t: true, d: true, m: true, c: true };
+  var sel = EVENTS[0].id;
+  var items = [], vis = [];
+
+  function tc(t) { return 'var(--c-' + t + ')'; }
+  function byId(id) { return EVENTS.filter(function (e) { return e.id === id; })[0]; }
+
+  function build() {
+    vis = EVENTS.filter(function (e) { return active[e.t]; });
+    var nonFut = vis.filter(function (e) { return !e.f; }).length;
+    items = vis.slice();
+    items.splice(nonFut, 0, { now: true, id: 'now', y: 2026.78, era: 6 });
+    if (!vis.some(function (e) { return e.id === sel; })) {
+      var cur = byId(sel), best = vis[0];
+      vis.forEach(function (e) { if (Math.abs(e.y - cur.y) < Math.abs(best.y - cur.y)) best = e; });
+      sel = best.id;
+    }
+  }
+
+  function renderTracks() {
+    var html = '';
+    Object.keys(TRACKS).forEach(function (k) {
+      var n = EVENTS.filter(function (e) { return e.t === k; }).length;
+      html += '<button class="chip" type="button" data-t="' + k + '" aria-pressed="' + (active[k] ? 'true' : 'false') + '" style="--tc:' + tc(k) + '"><span class="sw"></span>' + TRACKS[k].name + ' <span class="n">' + n + '</span></button>';
+    });
+    $('tracks').innerHTML = html;
+  }
+
+  function renderEras() {
+    var html = '';
+    var curEra = byId(sel).era;
+    ERAS.forEach(function (er) {
+      var has = vis.some(function (it) { return it.era === er.id; });
+      html += '<button class="chip" type="button" data-era="' + er.id + '"' + (has ? '' : ' disabled') + (curEra === er.id ? ' aria-current="true"' : '') + '><span class="num">' + er.n + '</span>' + er.name + '</button>';
+    });
+    $('eras').innerHTML = html;
+  }
+
+  var STEM = 84, AXY = 150;
+  function renderTimeline() {
+    var n = items.length;
+    var tlx = $('tlx');
+    tlx.style.minWidth = (n * 56 + 40) + 'px';
+    function cx(i) { return ((i + 0.5) / n * 100).toFixed(4) + '%'; }
+    var nowIdx = items.findIndex(function (it) { return it.now; });
+    var selIdx = items.findIndex(function (it) { return it.id === sel; });
+    var html = '';
+    html += '<div class="hl" id="hl" style="left:' + (selIdx / n * 100).toFixed(4) + '%;width:' + (100 / n).toFixed(4) + '%"></div>';
+    html += '<div class="axis" style="left:0;width:' + cx(nowIdx) + '"></div>';
+    html += '<div class="axis fut" style="left:' + cx(nowIdx) + ';right:0"></div>';
+    html += '<span class="aend" style="left:6px"></span><span class="aend" style="left:calc(100% - 6px)"></span>';
+    html += '<div class="now-line" style="left:' + cx(nowIdx) + '"></div>';
+    html += '<span class="now-lab" style="left:' + cx(nowIdx) + '">сегодня · 2026</span>';
+    var k = 0;
+    items.forEach(function (it, i) {
+      if (it.now) return;
+      var up = k % 2 === 0; k++;
+      var on = it.id === sel;
+      var st = '--tc:' + tc(it.t) + ';';
+      html += '<span class="stem' + (on ? ' sel' : '') + '" data-eid="' + it.id + '" style="left:' + cx(i) + ';top:' + (up ? AXY - STEM : AXY) + 'px;height:' + STEM + 'px"></span>';
+      html += '<span class="adot' + (it.f ? ' f' : '') + (on ? ' sel' : '') + '" data-eid="' + it.id + '" style="' + st + 'left:' + cx(i) + '"></span>';
+      html += '<button class="node ' + (up ? 'up' : 'dn') + (it.f ? ' f' : '') + (on ? ' sel' : '') + '" type="button" data-id="' + it.id + '" data-eid="' + it.id + '" aria-current="' + (on ? 'true' : 'false') + '" title="' + it.l + ': ' + it.title.replace(/"/g, '') + '" aria-label="' + it.l + ': ' + it.title.replace(/"/g, '') + '" style="' + st + 'left:' + (i / n * 100).toFixed(4) + '%;width:' + (100 / n).toFixed(4) + '%">'
+        + (up ? '<span class="yr">' + Math.floor(it.y) + '</span><span class="nc"></span>' : '<span class="nc"></span><span class="yr">' + Math.floor(it.y) + '</span>') + '</button>';
+    });
+    tlx.innerHTML = html;
+  }
+
+  function renderPanel() {
+    var e = byId(sel);
+    var idx = vis.indexOf(e);
+    $('panel').style.setProperty('--tc', tc(e.t));
+    $('pYear').textContent = e.l;
+    $('pTrack').textContent = TRACKS[e.t].name;
+    $('pFut').hidden = !e.f;
+    $('pTitle').textContent = e.title;
+    $('pDesc').textContent = e.d;
+    $('pWhy').textContent = e.w;
+    $('pSrcH').textContent = e.f ? 'Основания прогноза' : 'Источники';
+    var s = '';
+    e.src.forEach(function (r) { s += '<li><a href="' + r[1] + '" target="_blank" rel="noopener noreferrer">' + r[0] + '</a></li>'; });
+    if (!e.src.length) s = '<li>Гипотеза автора. Прямых источников нет.</li>';
+    $('pSrc').innerHTML = s;
+    $('pCount').textContent = 'Событие ' + (idx + 1) + ' из ' + vis.length;
+    $('prev').disabled = idx <= 0;
+    $('next').disabled = idx >= vis.length - 1;
+  }
+
+  function reveal() {
+    var tl = $('tl'), nd = document.querySelector('.node.sel');
+    if (!nd || tl.scrollWidth <= tl.clientWidth) return;
+    var c = nd.offsetLeft + nd.offsetWidth / 2;
+    tl.scrollTo({ left: Math.max(0, c - tl.clientWidth / 2), behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  function select(id) {
+    sel = id;
+    var n = items.length;
+    var selIdx = items.findIndex(function (it) { return it.id === sel; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-eid]'), function (el) {
+      var on = el.getAttribute('data-eid') === id;
+      el.classList.toggle('sel', on);
+      if (el.classList.contains('node')) el.setAttribute('aria-current', on ? 'true' : 'false');
+    });
+    var hl = $('hl');
+    hl.style.left = (selIdx / n * 100).toFixed(4) + '%';
+    renderPanel(); renderEras();
+    reveal();
+  }
+
+  function renderAll() {
+    build(); renderTracks(); renderEras(); renderTimeline(); renderPanel();
+    reveal();
+  }
+
+  function step(d) {
+    var idx = vis.findIndex(function (e) { return e.id === sel; });
+    var j = idx + d;
+    if (j >= 0 && j < vis.length) select(vis[j].id);
+  }
+
+  $('tlx').addEventListener('click', function (ev) {
+    var c = ev.target.closest('.node');
+    if (!c) return;
+    select(c.getAttribute('data-id'));
+  });
+  $('tracks').addEventListener('click', function (ev) {
+    var b = ev.target.closest('.chip'); if (!b) return;
+    var k = b.getAttribute('data-t');
+    active[k] = !active[k];
+    if (!Object.keys(active).some(function (x) { return active[x]; })) { Object.keys(active).forEach(function (x) { active[x] = true; }); }
+    renderAll();
+  });
+  $('eras').addEventListener('click', function (ev) {
+    var b = ev.target.closest('.chip'); if (!b || b.disabled) return;
+    var id = +b.getAttribute('data-era');
+    var first = vis.filter(function (e) { return e.era === id; })[0];
+    if (first) select(first.id);
+  });
+  $('prev').addEventListener('click', function () { step(-1); });
+  $('next').addEventListener('click', function () { step(1); });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    if (ev.key === 'ArrowRight') { ev.preventDefault(); step(1); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); step(-1); }
+  });
+
+  renderAll();
+})();
+</script>
+
+</body>
+</html>
